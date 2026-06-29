@@ -1,10 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import random
 import re
 import math
 import requests
 from bs4 import BeautifulSoup,SoupStrainer
+
+
 
 class Crawler:
     def __init__(self):
@@ -23,9 +25,12 @@ class Crawler:
         #["https://reality.bazos.sk/prenajmu/podnajom/","https://reality.bazos.sk/prenajmu/podnajom/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano"]
         ]
 
+        self.date_limit = datetime.now() - timedelta(weeks=3)
+        self._stop = False
 
     def start_processing(self):
         data = []
+        self._stop = False
         for link in self.links:
             data.extend(self.crawl_bazos(link[0], link[1]))
         return data
@@ -57,6 +62,8 @@ class Crawler:
                 time.sleep(random.uniform(1, 2))
             soup = BeautifulSoup(response.text, "lxml", parse_only=self.filter_main)
             data.extend(self.process_page(session, soup, curr_page))
+            if self._stop:
+                break
             previous_page = curr_page
             next_page_url = self.next_main_page(soup)
             if not next_page_url:
@@ -67,6 +74,8 @@ class Crawler:
         data = []
         accommodations = self.all_advertisement_getter(soup)
         for accommodation in accommodations:
+            if self._stop:
+                break
             publication = self.process_publication(session, accommodation, page_url)
             if publication:
                 data.append(publication)
@@ -85,6 +94,9 @@ class Crawler:
 
         title = self.title_publication(soup_aparment)
         date = self.date_of_post(soup_aparment)
+        if date < self.date_limit:
+            self._stop = True
+            return None
         description = self.description_publication(soup_aparment)
         price_text = f"Cena tohto bytu je {price}.\n" if price != "V texte" else ""
 
@@ -99,7 +111,7 @@ class Crawler:
             link=url_publication,
             description=final_text,
             state="Not proccessed",
-            data_post=date,
+            data_post=date.strftime("%Y-%m-%d"),
             data_crawler=datetime.now().strftime("%Y-%m-%d")
         )
 
@@ -153,7 +165,7 @@ class Crawler:
         date = date.group(1).replace(" ", "").strip().replace("-",".")
         parts = date.split(".")
         day,month,year = int(parts[0]),int(parts[1]),int(parts[2])
-        return  datetime(year,month,day).strftime("%Y-%m-%d")
+        return  datetime(year,month,day)
 
     def description_publication(self,soup_publication):
         paragraphs = soup_publication.select('div.popisdetail')
@@ -181,7 +193,8 @@ class Crawler:
             return None
 
         return "https://reality.bazos.sk" + next_div['href']
-
+    def add_links(self,default_link,sorted_link):
+        self.links.append([default_link,sorted_link])
 
 #if __name__ == "__main__":
     #crawler = Crawler()
