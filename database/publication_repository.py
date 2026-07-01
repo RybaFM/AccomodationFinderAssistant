@@ -1,11 +1,9 @@
 import psycopg
-from dotenv import load_dotenv
-import os
+from schemas import PublicationState
 
 class PublicationRepository:
-    def __init__(self):
-        load_dotenv()
-        self.db_url = os.getenv("DATABASE_URL")
+    def __init__(self, db_url):
+        self.db_url = db_url
 
     def insert_raw_publications(self, publications):
         if not publications:return
@@ -30,8 +28,8 @@ class PublicationRepository:
                                 publication.get("Source"), 
                                 publication.get("Description"),
                                 publication.get("State"), 
-                                publication.get("Date of processing"), 
-                                publication.get("Date of publishing")
+                                publication.get("Date of publishing"), 
+                                publication.get("Date of processing")
                             ))
                     except Exception as e:
                         print(f"DB(accommodation_publication) INSERT ERROR: {e}")
@@ -43,44 +41,45 @@ class PublicationRepository:
                 with conn.cursor() as cursor:
                     cursor.execute("""SELECT id, description 
                                 FROM accommodation_publication 
-                                WHERE state = 'raw' 
-                                LIMIT %s""", (number,))
+                                WHERE state = %s 
+                                LIMIT %s""", (PublicationState.RAW.value, number))
                     return cursor.fetchall()
         except Exception as e:
             print(f"DB(accommodation_publication) SELECT ERROR: {e}")
             return []
                 
-    def update_raw_publications(self, postings, postings_extracted_info):
-        if not postings or not postings_extracted_info: return
+    def update_raw_publications(self, publications, publications_extracted_info):
+        if not publications or not publications_extracted_info: return
         with psycopg.connect(self.db_url) as conn:
             with conn.cursor() as cursor:
-                for posting, info in zip(postings, postings_extracted_info):
-                    if info is None: 
-                        try:
-                            with conn.transaction():
-                                cursor.execute("""UPDATE accommodation_publication
-                                               SET state = 'error'
-                                               WHERE id = %s""", (posting[0],))
-                        except Exception as e:
-                            print(f"DB(accommodation_publication) ERROR while setting 'error' state: {e}")
-                            if conn.broken: break
-                        continue
+                for publication, info in zip(publications, publications_extracted_info):
                     try:
                         with conn.transaction():
+                            # NEED TO THINK ABOUT THIS PART
+                            if info is None: 
+                                self.set_error_state(publication[0], cursor)
+                                continue
+
                             cursor.execute("""UPDATE accommodation_publication
-                                            SET state = 'processed', 
+                                            SET state = %s, 
                                                 price = %s, 
                                                 rooms = %s, 
                                                 area_sqm = %s, 
                                                 address = %s, 
                                                 city = %s
                                             WHERE id = %s""", 
-                                            (info.get('price'),
+                                            (PublicationState.LLM_PROCESSED.value, 
+                                            info.get('price'),
                                             info.get('rooms'),
                                             info.get('area_sqm'),
                                             info.get('address'),
                                             info.get('city'),
-                                            posting[0]))
+                                            publication[0]))
                     except Exception as e:
                         print(f"DB(accommodation_publication) UPDATE ERROR: {e}")
                         if conn.broken: break
+        
+    def set_error_state(self, id, cursor):
+        cursor.execute("""UPDATE accommodation_publication
+            SET state = %s
+            WHERE id = %s""", (PublicationState.ERROR.value, id))
