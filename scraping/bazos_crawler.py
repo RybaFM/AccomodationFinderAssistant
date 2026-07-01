@@ -5,8 +5,6 @@ import re
 import math
 import requests
 from bs4 import BeautifulSoup,SoupStrainer
-from database.publication_repository import PublicationRepository 
-# CODE NEEDS TO BE RUN FROM ROOT FOLDER 
 
 
 
@@ -27,32 +25,42 @@ class Crawler:
         #["https://reality.bazos.sk/prenajmu/podnajom/","https://reality.bazos.sk/prenajmu/podnajom/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano"]
         ]
 
-        self.date_limit = datetime.now() - timedelta(weeks=3)
+        self.date_limit = datetime.now() - timedelta(weeks=4)
         self._stop = False
 
     def start_processing(self):
-        data = []
         self._stop = False
         for link in self.links:
-            data.extend(self.crawl_bazos(link[0], link[1]))
-        return data
-    def crawl_bazos(self,link_first_main,link_with_sorted):
-        session = requests.Session()
-        session.headers.update(self.HEADERS)
+             yield from self.crawl_bazos(link[0], link[1])
+    def crawl_bazos(self,link_first_main, link_with_sorted):
+        try:
+            session = requests.Session()
+            session.headers.update(self.HEADERS)
+            #Simulating real action of user
+            session.get(self.MAIN_URL)
+            time.sleep(random.randint(1, 3))
+            session.get(link_first_main)
+            time.sleep(random.randint(1, 3))
 
-        session.get(self.MAIN_URL)
-        time.sleep(random.randint(1, 3))
-        session.get(link_first_main)
-        time.sleep(random.randint(1, 3))
+            first_response = session.get(link_with_sorted)
+            time.sleep(random.uniform(1, 2))
 
-        first_response = session.get(link_with_sorted)
-        time.sleep(random.uniform(1, 2))
+            #Count number of pages
+            soup = BeautifulSoup(first_response.text, "lxml", parse_only=self.filter_main)
+            stats_tag = soup.find('div', class_='inzeratynadpis')
+            stats_text = stats_tag.get_text().strip().split("z")
+            cislo = int(stats_text[-1].strip().replace(" ", ""))
+            total_pages =  math.ceil(cislo / 20)
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to connect to link : {e}")
+            return
+        except Exception as e:
+            print(f"Can not count number of pages : {e}")
+            return
+        yield from self.process_main(session, link_with_sorted, first_response, total_pages)
 
-        total_pages = self.number_iteration_getter(first_response)
-        return self.process_main(session, link_with_sorted, first_response, total_pages)
-
-    def process_main(self,session,start_url,first_response,total_pages):
-        data = []
+    def process_main(self,session, start_url,
+                     first_response, total_pages):
         curr_page = start_url
         response = first_response
         previous_page = None
@@ -60,10 +68,19 @@ class Crawler:
             if pag_index > 0:
                 if previous_page:
                     session.headers.update({"Referer": previous_page})
-                response = session.get(curr_page)
+
+                try:
+                    response = session.get(curr_page, timeout=10)
+                    response.raise_for_status()
+                except Exception as e:
+                    print(f"Can not connect to site {curr_page}: {e}")
+                    continue
                 time.sleep(random.uniform(1, 2))
+
             soup = BeautifulSoup(response.text, "lxml", parse_only=self.filter_main)
-            data.extend(self.process_page(session, soup, curr_page))
+
+            yield self.process_page(session, soup, curr_page)
+
             if self._stop:
                 break
             previous_page = curr_page
@@ -71,10 +88,10 @@ class Crawler:
             if not next_page_url:
                 break
             curr_page = next_page_url
-        return data
-    def process_page(self,session,soup,page_url):
+
+    def process_page(self,session, soup, page_url):
         data = []
-        accommodations = self.all_advertisement_getter(soup)
+        accommodations = soup.find_all('div', class_="inzeraty inzeratyflex")
         for accommodation in accommodations:
             if self._stop:
                 break
@@ -82,25 +99,43 @@ class Crawler:
             if publication:
                 data.append(publication)
         return data
-        # IN THE END MUST SAVE EVERYTHING IN DB USING PublicationRepository CLASS
 
-    def process_publication(self,session,accommodation,page_url):
-        url_publication = self.link_getter(accommodation)
+    def process_publication(self,session,
+                            accommodation,
+                            page_url):
 
-        price = self.price_getter(accommodation)
-        if price in self.exceptions:
-            return
-        location = self.location_getter(accommodation)
-        session.headers.update({"Referer": page_url})
-
-        soup_aparment = self.move_to_inzerat(session,url_publication)
-
-        title = self.title_publication(soup_aparment)
-        date = self.date_of_post(soup_aparment)
+        date = self.date_of_post(accommodation)
         if date < self.date_limit:
             self._stop = True
             return None
-        description = self.description_publication(soup_aparment)
+
+        link_publication_tag = accommodation.find('div', class_='inzeratynadpis')
+        a_tag = link_publication_tag.find('a', href=True)
+        if a_tag is None:
+            return
+        raw_href = a_tag['href']
+        url_publication = "https://reality.bazos.sk" + raw_href
+
+        session.headers.update({"Referer": page_url})
+        soup_aparment = self.move_to_inzerat(session, url_publication)
+
+        if soup_aparment is None: return
+        #Getting information
+        try:
+            price_tag = accommodation.find('div', class_='inzeratycena')
+            price = price_tag.text.strip() if price_tag else "Не вказано"
+
+            location_tag = accommodation.find('div', class_='inzeratylok')
+            location = " ".join(location_tag.get_text(separator=" ").strip().split()) if location_tag else "Невідомо"
+
+            title_tag = soup_aparment.find('h1', class_='nadpisdetail')
+            title = title_tag.text.strip() if title_tag else "Без назви"
+
+            paragraphs = soup_aparment.select('div.popisdetail')
+            description = '\n'.join([paragraph.text.strip() for paragraph in paragraphs]) if paragraphs else ""
+        except AttributeError as e:
+            print(f"Can not parse data from publication {page_url}: {e}")
+            return
         price_text = f"Cena tohto bytu je {price}.\n" if price != "V texte" else ""
 
         final_text = (
@@ -109,83 +144,44 @@ class Crawler:
             f"{price_text}"
             f"Lokalita je {location}."
         )
-        return self.construct_dict_input(
-            source="Bazos",
-            link=url_publication,
-            description=final_text,
-            state="raw", # status 'raw', not 'not processed'
-            data_post=date.strftime("%Y-%m-%d"),
-            data_crawler=datetime.now().strftime("%Y-%m-%d")
-        )
+        return {"Source": "Bazos",
+                "Link":url_publication,
+                "Description":final_text,
+                "State": "raw",
+                "Date of processing": datetime.now().strftime("%Y-%m-%d"),
+                "Date of publishing": date.strftime("%Y-%m-%d")}
 
-    def number_iteration_getter(self, responce):
-        #main_hub_once
-        soup = BeautifulSoup(responce.text, "lxml", parse_only=self.filter_main)
-        stats_tag = soup.find('div', class_='inzeratynadpis')
-        stats_text = stats_tag.get_text().strip().split("z")
-        cislo = int(stats_text[-1].strip().replace(" ", ""))
-        return math.ceil(cislo / 20)
-
-    def all_advertisement_getter(self,soup):
-        #main_hub
-        return soup.find_all('div', class_="inzeraty inzeratyflex")
-
-    def link_getter(self,publication):
-        #main_hub_publication
-        link_publication_tag = publication.find('div', class_='inzeratynadpis')
-        a_tag = link_publication_tag.find('a', href=True)
-        raw_href = a_tag['href']
-        return "https://reality.bazos.sk" + raw_href
-
-    def price_getter(self,publication):
-        #main_hub_publication
-        price_tag = publication.find('div', class_='inzeratycena')
-        return price_tag.text.strip()
-
-    def location_getter(self,publication):
-        #main_hub_publication
-        location_tag = publication.find('div', class_='inzeratylok')
-        location = location_tag.get_text(separator=" ").strip()
-        return " ".join(location.split())
-
-    def move_to_inzerat(self,session,url_publication):
-        #from main to publication
-        response_publication = session.get(url_publication)
-        time.sleep(random.uniform(1, 2))
-        soup_publication = BeautifulSoup(response_publication.text, "lxml",
-                                     parse_only=self.descript_filter_publication)
+    def move_to_inzerat(self,session, url_publication):
+            #from main to publication
+        try:
+            response_publication = session.get(url_publication)
+            time.sleep(random.uniform(1, 2))
+            soup_publication = BeautifulSoup(response_publication.text, "lxml",
+                                         parse_only=self.descript_filter_publication)
+        except Exception as e:
+            print(f"Can not connect to publication {url_publication}: {e}")
+            return
         return soup_publication
 
-    def title_publication(self,soup_publication):
-        #title from publication
-        h1_tag = soup_publication.find('h1', class_='nadpisdetail')
-        return h1_tag.text.strip()
 
-    def date_of_post(self,soup_publication):
+
+    def date_of_post(self, soup_publication):
         #date of post from publication
-        date_tag = soup_publication.find('span', class_='velikost10')
-        date = re.search(r'\[(.+?)\]', date_tag.text)
-        date = date.group(1).replace(" ", "").strip().replace("-",".")
-        parts = date.split(".")
-        day,month,year = int(parts[0]),int(parts[1]),int(parts[2])
-        return  datetime(year,month,day)
+        try:
+            date_tag = soup_publication.find('span', class_='velikost10')
+            if not date_tag:
+                return None
+            date_match = re.search(r'\[(.+?)\]', date_tag.text)
+            if not date_match:
+                return None
+            date_str = date_match.group(1).replace(" ", "").strip().replace("-", ".")
+            parts = date_str.split(".")
+            return datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+        except Exception as e:
+            print(f"Failed to parse date: {e}")
+            return
 
-    def description_publication(self,soup_publication):
-        paragraphs = soup_publication.select('div.popisdetail')
-        return '\n'.join([paragraph.text.strip() for paragraph in paragraphs])
-
-    def construct_dict_input(self,source,link,
-                             description,state,
-                             data_post,data_crawler):
-        data = {"Source": source,
-                "Link":link,
-                "Description":description,
-                "State": state,
-                "Date of processing": data_post,
-                "Date of publishing": data_crawler}
-        return data
-
-    def next_main_page(self,soup):
+    def next_main_page(self, soup):
         #from main_hub
         pagination_div = soup.find('div', class_='strankovani')
         if not pagination_div:
@@ -196,7 +192,7 @@ class Crawler:
             return None
 
         return "https://reality.bazos.sk" + next_div['href']
-    def add_links(self,default_link,sorted_link):
+    def add_links(self,default_link, sorted_link):
         self.links.append([default_link,sorted_link])
 
 if __name__ == "__main__":
