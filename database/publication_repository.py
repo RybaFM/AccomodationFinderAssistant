@@ -1,5 +1,7 @@
 import psycopg
-from schemas import PublicationState
+from schemas import PublicationState, ApartmentLLMFeatures
+import logging
+logger = logging.getLogger(__name__)
 
 class PublicationRepository:
     def __init__(self, db_url):
@@ -31,11 +33,11 @@ class PublicationRepository:
                                 publication.get("Date of publishing"), 
                                 publication.get("Date of processing")
                             ))
-                    except Exception as e:
-                        print(f"DB(accommodation_publication) INSERT ERROR: {e}")
+                    except Exception:
+                        logger.exception("DB(accommodation_publication) INSERT ERROR")
                         if conn.broken: break
 
-    def select_raw_publications(self, number):
+    def select_raw_publications(self, number=20):
         try:
             with psycopg.connect(self.db_url) as conn:
                 with conn.cursor() as cursor:
@@ -44,22 +46,22 @@ class PublicationRepository:
                                 WHERE state = %s 
                                 LIMIT %s""", (PublicationState.RAW.value, number))
                     return cursor.fetchall()
-        except Exception as e:
-            print(f"DB(accommodation_publication) SELECT ERROR: {e}")
+        except Exception:
+            logger.exception("DB(accommodation_publication) SELECT ERROR")
             return []
                 
-    def update_raw_publications(self, publications, publications_extracted_info):
-        if not publications or not publications_extracted_info: return
+    def update_raw_publications(self, publications_extracted_info: list[tuple[int, ApartmentLLMFeatures | None]]):
+        if not publications_extracted_info: return
         with psycopg.connect(self.db_url) as conn:
             with conn.cursor() as cursor:
-                for publication, info in zip(publications, publications_extracted_info):
+                for (publication_id, info) in publications_extracted_info:
                     try:
-                        with conn.transaction():
-                            # NEED TO THINK ABOUT THIS PART
-                            if info is None: 
-                                self.set_error_state(publication[0], cursor)
-                                continue
+                        if info is None: 
+                            with conn.transaction():    
+                                self.set_error_state(publication_id, cursor)
+                            continue
 
+                        with conn.transaction():
                             cursor.execute("""UPDATE accommodation_publication
                                             SET state = %s, 
                                                 price = %s, 
@@ -69,17 +71,17 @@ class PublicationRepository:
                                                 city = %s
                                             WHERE id = %s""", 
                                             (PublicationState.LLM_PROCESSED.value, 
-                                            info.get('price'),
-                                            info.get('rooms'),
-                                            info.get('area_sqm'),
-                                            info.get('address'),
-                                            info.get('city'),
-                                            publication[0]))
-                    except Exception as e:
-                        print(f"DB(accommodation_publication) UPDATE ERROR: {e}")
+                                            info.price,
+                                            info.rooms,
+                                            info.area_sqm,
+                                            info.address,
+                                            info.city,
+                                            publication_id))
+                    except Exception:
+                        logger.exception("DB(accommodation_publication) UPDATE ERROR")
                         if conn.broken: break
         
-    def set_error_state(self, id, cursor):
+    def set_error_state(self, cursor, id):
         cursor.execute("""UPDATE accommodation_publication
             SET state = %s
             WHERE id = %s""", (PublicationState.ERROR.value, id))

@@ -1,7 +1,9 @@
 from google import genai
 import json
 import time
-from schemas import ApartmentFeatures
+from schemas import ApartmentLLMFeatures
+import logging
+logger = logging.getLogger(__name__)
 
 class ExtractorLLM:
     def __init__(self, apiKey, model_id="gemini-3.1-flash-lite"):
@@ -22,19 +24,19 @@ class ExtractorLLM:
                     config={
                         "system_instruction": system_instruction,
                         "response_mime_type": "application/json",
-                        "response_schema": ApartmentFeatures,
+                        "response_schema": ApartmentLLMFeatures,
                     },
                     contents=posted_text
                 )
-                print(f"--- AI SENTIMENT ({self.model_id}) ---")
-                print(response.text)
-                return json.loads(response.text.strip())
-            except Exception as e:
-                print(f"AI API Error: {e}")
+                logger.info(f"--- AI RESPONSE ({self.model_id}) ---")
+                logger.info(response.text)
+                return ApartmentLLMFeatures.model_validate_json(response.text.strip())
+                #json.loads(response.text.strip())
+            except Exception:
                 if attempt < max_retries-1:
                     sleep_time = (attempt + 1) * 2 
-                    print("Retrying...")
+                    logger.warning("AI API Error, retrying...")
                     time.sleep(sleep_time)
                 else:
-                    print("All attempts failed for this post.")
+                    logger.exception("AI API Error, all attempts failed for this post")
         return None
