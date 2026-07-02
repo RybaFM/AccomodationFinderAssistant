@@ -1,5 +1,5 @@
 import time
-from database.publication_repository import PublicationRepository
+from db_interaction.publication_repository import PublicationRepository
 from processing.extractor_llm import ExtractorLLM
 import logging
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class PublicationProcessor:
             processed_publications.append((publication_id, self.extractor_llm.extract_info(description)))
 
         successfully_processed = len(processed_publications) - sum(1 for _, info in processed_publications if info is None)
-        logger.info(f"LLM processed successfully {successfully_processed}/{len(processed_publications)} publications")
+        logger.debug(f"LLM processed successfully {successfully_processed}/{len(processed_publications)} publications")
         self.publication_repository.update_raw_publications(processed_publications)
         return True
 

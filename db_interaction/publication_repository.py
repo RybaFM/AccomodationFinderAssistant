@@ -1,5 +1,5 @@
 import psycopg
-from schemas import PublicationState, ApartmentLLMFeatures
+from schemas import PublicationState, ApartmentLLMFeatures, ApartmentRawFeatures
 import logging
 logger = logging.getLogger(__name__)
 
@@ -7,7 +7,7 @@ class PublicationRepository:
     def __init__(self, db_url):
         self.db_url = db_url
 
-    def insert_raw_publications(self, publications):
+    def insert_raw_publications(self, publications: list[ApartmentRawFeatures]):
         if not publications:return
         with psycopg.connect(self.db_url) as conn:
             with conn.cursor() as cursor:
@@ -26,12 +26,12 @@ class PublicationRepository:
                                 ON CONFLICT (link) DO NOTHING
                             """, 
                             (
-                                publication.get("Link"), 
-                                publication.get("Source"), 
-                                publication.get("Description"),
-                                publication.get("State"), 
-                                publication.get("Date of publishing"), 
-                                publication.get("Date of processing")
+                                publication.link, 
+                                publication.source.value, 
+                                publication.description,
+                                publication.state.value, 
+                                publication.scraping_date, 
+                                publication.posted_date
                             ))
                     except Exception:
                         logger.exception("DB(accommodation_publication) INSERT ERROR")
@@ -49,6 +49,24 @@ class PublicationRepository:
         except Exception:
             logger.exception("DB(accommodation_publication) SELECT ERROR")
             return []
+        
+    def select_llm_processed_publications(self, number=20):
+        try:
+            with psycopg.connect(self.db_url) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""SELECT id, address, city
+                                   FROM accomodation_publication
+                                   WHERE state = %s
+                                   LIMIT %s""", 
+                                   (PublicationState.LLM_PROCESSED.value, number))
+        except Exception:
+            logger.exception("DB(accommodation_publication) SELECT ERROR")
+            return []
+        
+    def set_error_state(self, cursor, id):
+        cursor.execute("""UPDATE accommodation_publication
+            SET state = %s
+            WHERE id = %s""", (PublicationState.ERROR.value, id))
                 
     def update_raw_publications(self, publications_extracted_info: list[tuple[int, ApartmentLLMFeatures | None]]):
         if not publications_extracted_info: return
@@ -80,8 +98,3 @@ class PublicationRepository:
                     except Exception:
                         logger.exception("DB(accommodation_publication) UPDATE ERROR")
                         if conn.broken: break
-        
-    def set_error_state(self, cursor, id):
-        cursor.execute("""UPDATE accommodation_publication
-            SET state = %s
-            WHERE id = %s""", (PublicationState.ERROR.value, id))

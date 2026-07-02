@@ -1,5 +1,4 @@
 from google import genai
-import json
 import time
 from schemas import ApartmentLLMFeatures
 import logging
@@ -28,8 +27,8 @@ class ExtractorLLM:
                     },
                     contents=posted_text
                 )
-                logger.info(f"--- AI RESPONSE ({self.model_id}) ---")
-                logger.info(response.text)
+                logger.debug(f"--- AI RESPONSE ({self.model_id}) ---")
+                logger.debug(response.text)
                 return ApartmentLLMFeatures.model_validate_json(response.text.strip())
                 #json.loads(response.text.strip())
             except Exception:

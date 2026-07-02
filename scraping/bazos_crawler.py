@@ -144,6 +144,7 @@ class Crawler:
             f"{price_text}"
             f"Lokalita je {location}."
         )
+        # CHANGE TO PYDANTIC MODEL
         return {"Source": "Bazos",
                 "Link":url_publication,
                 "Description":final_text,

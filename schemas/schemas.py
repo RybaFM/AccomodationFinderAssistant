@@ -1,6 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 
 # ENUMS
 class PublicationState(str, Enum):
@@ -9,9 +10,18 @@ class PublicationState(str, Enum):
     FULLY_PROCESSED = "fully_processed"
     ERROR = "error"
 
+class PublicationSource(str, Enum):
+    BAZOS = "bazos"
+    NEHNUTELNOSTI = "nehnutelnosti"
+
 # MODELS
 class ApartmentRawFeatures(BaseModel):
-    pass
+    source: PublicationSource
+    link: str
+    description: str
+    state: PublicationState = PublicationState.RAW
+    scraping_date: datetime
+    posted_date: datetime
 
 class ApartmentLLMFeatures(BaseModel):
     price: Optional[int] = Field(None, description="Apartment price (number only). If not specified, return null.")
