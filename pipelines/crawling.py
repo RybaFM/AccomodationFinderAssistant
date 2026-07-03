@@ -24,5 +24,5 @@ class CrawlRunner:
             total_saved += 1
             logger.debug(f"Saved {len(page_items)} items in {total_saved} pages")
 
-        logger.info(f"Total saved {len(total_saved)} pages")
+        logger.info(f"Total saved {total_saved} pages")
         return total_saved
