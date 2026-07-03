@@ -1,141 +1,108 @@
-from datetime import datetime, timedelta
-import time
-import random
+import logging
 import re
 import math
-import requests
-from bs4 import BeautifulSoup,SoupStrainer
+from datetime import datetime
+from bs4 import SoupStrainer,BeautifulSoup
+from tamplate_of_crawlers import Crawler
+from schemas.schemas import PublicationState,PublicationSource,ApartmentRawFeatures
+logger = logging.getLogger(__name__)
 
 
 
-class Crawler:
+class BazosCrawler(Crawler):
     def __init__(self):
-        self.MAIN_URL = "https://reality.bazos.sk/"
-        self.HEADERS=  {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer": "https://www.google.com/"
-        }
+        super().__init__(weeks_limit=1)
+        self._exceptions = {"Dohodou", "Zadarmo"}
+        self._detail_strainer_obj = SoupStrainer("div", class_="maincontent")
+        self._filter_main_obj = SoupStrainer("div", class_=["maincontent", "strankovani"])
+        self.add_links(
+            "https://reality.bazos.sk/prenajmu/byt/",
+            "https://reality.bazos.sk/prenajmu/byt/?hledat=&rubriky=reality&hlokalita=81101"
+            "&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano",
+        )
+    def _main_url(self):
+        #main url
+        return "https://reality.bazos.sk/"
 
-        self.descript_filter_publication = SoupStrainer("div", class_="maincontent")
-        self.filter_main = SoupStrainer("div", class_=["maincontent", "strankovani"])
-        self.exceptions = {"Dohodou", "Zadarmo"}
-        self.links = [
-        ["https://reality.bazos.sk/prenajmu/byt/","https://reality.bazos.sk/prenajmu/byt/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano"]
-        #["https://reality.bazos.sk/prenajmu/dom/","https://reality.bazos.sk/prenajmu/dom/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&Submit=H%C4%BEada%C5%A5&order=&crp=&kitx=ano"]
-        #["https://reality.bazos.sk/prenajmu/podnajom/","https://reality.bazos.sk/prenajmu/podnajom/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano"]
-        ]
+    def _filter_main(self):
+        #SoupStrainer for main
+        return self._filter_main_obj
 
-        self.date_limit = datetime.now() - timedelta(weeks=4)
-        self._stop = False
+    def _detail_strainer(self):
+        #SoupStrainer for publication
+        return self._detail_strainer_obj
 
-    def start_processing(self):
-        self._stop = False
-        for link in self.links:
-             yield from self.crawl_bazos(link[0], link[1])
-    def crawl_bazos(self,link_first_main, link_with_sorted):
-        try:
-            session = requests.Session()
-            session.headers.update(self.HEADERS)
-            #Simulating real action of user
-            session.get(self.MAIN_URL)
-            time.sleep(random.randint(1, 3))
-            session.get(link_first_main)
-            time.sleep(random.randint(1, 3))
+    def _count_pages(self, soup):
+        #count all pages of publication
+        stats_tag = soup.select_one("div.inzeratynadpis")
+        stats_text = stats_tag.get_text().strip().split("z")
+        number = int(stats_text[-1].strip().replace(" ", ""))
+        return  math.ceil(number / 20)
 
-            first_response = session.get(link_with_sorted)
-            time.sleep(random.uniform(1, 2))
+    def _iter_publications(self,soup):
+        #Getting all publication div
+        return soup.select("div.inzeraty.inzeratyflex")
 
-            #Count number of pages
-            soup = BeautifulSoup(first_response.text, "lxml", parse_only=self.filter_main)
-            stats_tag = soup.find('div', class_='inzeratynadpis')
-            stats_text = stats_tag.get_text().strip().split("z")
-            cislo = int(stats_text[-1].strip().replace(" ", ""))
-            total_pages =  math.ceil(cislo / 20)
-        except requests.exceptions.RequestException as e:
-            print(f"Failed to connect to link : {e}")
-            return
-        except Exception as e:
-            print(f"Can not count number of pages : {e}")
-            return
-        yield from self.process_main(session, link_with_sorted, first_response, total_pages)
-
-    def process_main(self,session, start_url,
-                     first_response, total_pages):
-        curr_page = start_url
-        response = first_response
-        previous_page = None
-        for pag_index in range(total_pages):
-            if pag_index > 0:
-                if previous_page:
-                    session.headers.update({"Referer": previous_page})
-
-                try:
-                    response = session.get(curr_page, timeout=10)
-                    response.raise_for_status()
-                except Exception as e:
-                    print(f"Can not connect to site {curr_page}: {e}")
-                    continue
-                time.sleep(random.uniform(1, 2))
-
-            soup = BeautifulSoup(response.text, "lxml", parse_only=self.filter_main)
-
-            yield self.process_page(session, soup, curr_page)
-
-            if self._stop:
-                break
-            previous_page = curr_page
-            next_page_url = self.next_main_page(soup)
-            if not next_page_url:
-                break
-            curr_page = next_page_url
-
-    def process_page(self,session, soup, page_url):
-        data = []
-        accommodations = soup.find_all('div', class_="inzeraty inzeratyflex")
-        for accommodation in accommodations:
-            if self._stop:
-                break
-            publication = self.process_publication(session, accommodation, page_url)
-            if publication:
-                data.append(publication)
-        return data
-
-    def process_publication(self,session,
-                            accommodation,
-                            page_url):
-
-        date = self.date_of_post(accommodation)
-        if date < self.date_limit:
-            self._stop = True
+    def _date_of_post(self, publication):
+        #Getting data of posting that publication
+        date_tag = publication.select_one('span.velikost10')
+        if not date_tag:
             return None
 
-        link_publication_tag = accommodation.find('div', class_='inzeratynadpis')
-        a_tag = link_publication_tag.find('a', href=True)
-        if a_tag is None:
-            return
-        raw_href = a_tag['href']
-        url_publication = "https://reality.bazos.sk" + raw_href
+        date = re.search(r'\[(.+?)\]', date_tag.text)
+        if not date:
+            return None
 
-        session.headers.update({"Referer": page_url})
-        soup_aparment = self.move_to_inzerat(session, url_publication)
+        date_str = date.group(1).replace(" ", "").strip().replace("-",".")
 
-        if soup_aparment is None: return
-        #Getting information
         try:
-            price_tag = accommodation.find('div', class_='inzeratycena')
-            price = price_tag.text.strip() if price_tag else "Не вказано"
+            day, month, year = date_str.split(".")
+            return datetime(int(year), int(month), int(day))
 
-            location_tag = accommodation.find('div', class_='inzeratylok')
-            location = " ".join(location_tag.get_text(separator=" ").strip().split()) if location_tag else "Невідомо"
+        except Exception as e:
+            logger.warning("Failed to parse date %r: %s", date_str, e)
+            return None
 
-            title_tag = soup_aparment.find('h1', class_='nadpisdetail')
-            title = title_tag.text.strip() if title_tag else "Без назви"
+    def _get_publication_url(self, publication):
+        #Getting url publication
+        link_tag = publication.select_one("div.inzeratynadpis")
+        a_tag = link_tag.select_one("a[href]") if link_tag else None
+        if a_tag is None:
+            return None
 
-            paragraphs = soup_aparment.select('div.popisdetail')
-            description = '\n'.join([paragraph.text.strip() for paragraph in paragraphs]) if paragraphs else ""
-        except AttributeError as e:
-            print(f"Can not parse data from publication {page_url}: {e}")
-            return
+        return self._main_url().rstrip("/") + a_tag.get("href")
+
+    def _next_main_page(self, soup):
+        #Finding the next main_page
+        pagination_div = soup.select_one('div.strankovani')
+        if not pagination_div:
+            return None
+        #Choose correct div by text
+        next_div = next((a for a in pagination_div.find_all('a') if 'alšia' in a.get_text()), None)
+        if not next_div:
+            return None
+        return self._main_url().rstrip("/") + next_div.get("href")
+
+    def _build_output(self,
+                      publication,
+                      detail_soup,
+                      url_publication,
+                      date):
+        #Creating output for publication
+
+        price = publication.select_one("div.inzeratycena").text.strip()
+        if price in self._exceptions:
+            logger.debug("Skipping publication %s: price is %r", url_publication, price)
+            return None
+
+        location = " ".join(publication.select_one('div.inzeratylok').get_text(separator=" ").strip().split())
+
+
+        title = detail_soup.select_one('h1.nadpisdetail').text.strip()
+
+        paragraphs = detail_soup.select('div.popisdetail')
+        description = '\n'.join(p.text.strip() for p in paragraphs) if paragraphs else ""
+
         price_text = f"Cena tohto bytu je {price}.\n" if price != "V texte" else ""
 
         final_text = (
@@ -144,60 +111,27 @@ class Crawler:
             f"{price_text}"
             f"Lokalita je {location}."
         )
-        # CHANGE TO PYDANTIC MODEL
-        return {"Source": "Bazos",
-                "Link":url_publication,
-                "Description":final_text,
-                "State": "raw",
-                "Date of processing": datetime.now().strftime("%Y-%m-%d"),
-                "Date of publishing": date.strftime("%Y-%m-%d")}
 
-    def move_to_inzerat(self,session, url_publication):
-            #from main to publication
-        try:
-            response_publication = session.get(url_publication)
-            time.sleep(random.uniform(1, 2))
-            soup_publication = BeautifulSoup(response_publication.text, "lxml",
-                                         parse_only=self.descript_filter_publication)
-        except Exception as e:
-            print(f"Can not connect to publication {url_publication}: {e}")
-            return
-        return soup_publication
+        return ApartmentRawFeatures(
+            source=PublicationSource.BAZOS,
+            link=url_publication,
+            description=final_text,
+            state=PublicationState.RAW,
+            scraping_date=datetime.now(),
+            posted_date=date,
+        )
 
-
-
-    def date_of_post(self, soup_publication):
-        #date of post from publication
-        try:
-            date_tag = soup_publication.find('span', class_='velikost10')
-            if not date_tag:
-                return None
-            date_match = re.search(r'\[(.+?)\]', date_tag.text)
-            if not date_match:
-                return None
-            date_str = date_match.group(1).replace(" ", "").strip().replace("-", ".")
-            parts = date_str.split(".")
-            return datetime(int(parts[2]), int(parts[1]), int(parts[0]))
-        except Exception as e:
-            print(f"Failed to parse date: {e}")
-            return
-
-    def next_main_page(self, soup):
-        #from main_hub
-        pagination_div = soup.find('div', class_='strankovani')
-        if not pagination_div:
-            return None
-
-        next_div = next((a for a in pagination_div.find_all('a') if 'alšia' in a.get_text()), None)
-        if not next_div:
-            return None
-
-        return "https://reality.bazos.sk" + next_div['href']
-    def add_links(self,default_link, sorted_link):
-        self.links.append([default_link,sorted_link])
 
 if __name__ == "__main__":
-    crawler = Crawler()
-    data = crawler.start_processing()
-    for item in data:
-        print(item)
+    #create the config for logger
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[
+            logging.StreamHandler()
+        ],
+    )
+    #testing
+    crawler = BazosCrawler()
+    for page_items in crawler.start_processing():
+        print(page_items)
