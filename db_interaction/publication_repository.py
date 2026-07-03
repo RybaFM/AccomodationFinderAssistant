@@ -1,5 +1,5 @@
 import psycopg
-from schemas import PublicationState, ApartmentLLMFeatures, ApartmentRawFeatures
+from schemas.schemas import PublicationState, ApartmentLLMFeatures, ApartmentRawFeatures
 import logging
 logger = logging.getLogger(__name__)
 
