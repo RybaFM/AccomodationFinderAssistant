@@ -1,13 +1,18 @@
 import time
 from db_interaction.publication_repository import PublicationRepository
 from processing.extractor_llm import ExtractorLLM
+from processing.extractor_geo import ExtractorGEO
 import logging
 logger = logging.getLogger(__name__)
 
 class PublicationProcessor:
-    def __init__(self, publication_repository: PublicationRepository, extractor_llm: ExtractorLLM):
+    def __init__(self, 
+                 publication_repository: PublicationRepository, 
+                 extractor_llm: ExtractorLLM,
+                 extractor_geo: ExtractorGEO):
         self.publication_repository = publication_repository
         self.extractor_llm = extractor_llm
+        self.extractor_geo = extractor_geo
 
     def process(self, batch_size=20):
         while True:
@@ -31,5 +36,15 @@ class PublicationProcessor:
         self.publication_repository.update_raw_publications(processed_publications)
         return True
 
+    # UNFINISHED
     def process_geo(self, batch_size=20):
-        pass
+        publications = self.publication_repository.select_llm_processed_publications(batch_size)
+        if not publications: return False
+
+        processed_publications = []
+        for (publication_id, building, street, district, city, country) in publications:
+            processed_publications.append((publication_id, self.extractor_geo.extract_info([building, street, district, city, country])))
+            time.sleep(1.2)
+
+        self.publication_repository.update_llm_processed_publications(processed_publications)
+        return True

@@ -1,6 +1,6 @@
 from google import genai
 import time
-from schemas import ApartmentLLMFeatures
+from schemas.schemas import ApartmentLLMFeatures
 import logging
 logger = logging.getLogger(__name__)
 

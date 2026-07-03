@@ -1,5 +1,5 @@
 import psycopg
-from schemas.schemas import PublicationState, ApartmentLLMFeatures, ApartmentRawFeatures
+from schemas.schemas import PublicationState, ApartmentRawFeatures, ApartmentLLMFeatures, ApartmentGeoFeatures
 import logging
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class PublicationRepository:
         try:
             with psycopg.connect(self.db_url) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("""SELECT id, address, city
+                    cursor.execute("""SELECT id, building, street, district, city, country
                                    FROM accomodation_publication
                                    WHERE state = %s
                                    LIMIT %s""", 
@@ -76,7 +76,7 @@ class PublicationRepository:
                     try:
                         if info is None: 
                             with conn.transaction():    
-                                self.set_error_state(publication_id, cursor)
+                                self.set_error_state(cursor, publication_id)
                             continue
 
                         with conn.transaction():
@@ -85,16 +85,25 @@ class PublicationRepository:
                                                 price = %s, 
                                                 rooms = %s, 
                                                 area_sqm = %s, 
-                                                address = %s, 
-                                                city = %s
+                                                building = %s,
+                                                street = %s,
+                                                district = %s, 
+                                                city = %s,
+                                                country = %s
                                             WHERE id = %s""", 
                                             (PublicationState.LLM_PROCESSED.value, 
                                             info.price,
                                             info.rooms,
                                             info.area_sqm,
-                                            info.address,
+                                            info.building,
+                                            info.street,
+                                            info.district,
                                             info.city,
+                                            info.country,
                                             publication_id))
                     except Exception:
                         logger.exception("DB(accommodation_publication) UPDATE ERROR")
                         if conn.broken: break
+
+    def update_llm_processed_publications(self, publications_extracted_info: list[tuple[int, ApartmentGeoFeatures | None]]): 
+        pass
