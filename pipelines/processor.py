@@ -36,7 +36,6 @@ class PublicationProcessor:
         self.publication_repository.update_raw_publications(processed_publications)
         return True
 
-    # UNFINISHED
     def process_geo(self, batch_size=20):
         publications = self.publication_repository.select_llm_processed_publications(batch_size)
         if not publications: return False

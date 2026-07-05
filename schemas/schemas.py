@@ -35,3 +35,14 @@ class ApartmentLLMFeatures(BaseModel):
 
 class ApartmentGeoFeatures(BaseModel):
     distance_to_center: Optional[float]
+    distance_to_shopping_mall: Optional[float]
+    nearest_shopping_mall_name: Optional[str]
+    distance_to_supermarket: Optional[float]
+    nearest_supermarket_name: Optional[str]
+    distance_to_transport_stop: Optional[float]
+    nearest_transport_stop_name: Optional[str]
+
+class InfrastructureFeatures(BaseModel):
+    name: Optional[str]
+    latitude: float
+    longitude: float

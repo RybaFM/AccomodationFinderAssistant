@@ -1,4 +1,5 @@
-from schemas.schemas import ApartmentGeoFeatures
+from schemas.schemas import ApartmentGeoFeatures, InfrastructureFeatures
+from processing.infrastructure_service import InfrastructureService
 import geopy
 from geopy.geocoders import Nominatim
 from geopy import distance
@@ -7,8 +8,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ExtractorGEO:
-    def __init__(self, user_agent_):
-        self.geocoder = Nominatim(user_agent=user_agent_)
+    def __init__(self, infrastructure_service: InfrastructureService):
+        self.geocoder = Nominatim(user_agent="AccomodationFinderAssistant/1.0 (contact: rjbikov.yaroslav@gmail.com)")
+        self.infrastructure_service = infrastructure_service
         self.center_coordinates = {}
 
     def extract_info(self, publication_address: list[str]):
@@ -23,7 +25,23 @@ class ExtractorGEO:
         if not publication_coordinates: 
             return None
         distance_to_center = self.get_distance_to_center(publication_coordinates, city, country)
-        return ApartmentGeoFeatures(distance_to_center)
+
+        shopping_malls = self.infrastructure_service.get_shopping_malls(publication_coordinates)
+        shopping_mall_name, shopping_mall_dist = self.get_nearest_spots(publication_coordinates, shopping_malls)
+
+        supermarkets = self.infrastructure_service.get_supermarkets(publication_coordinates)
+        supermarket_name, supermarket_dist = self.get_nearest_spots(publication_coordinates, supermarkets)
+
+        transport_stops = self.infrastructure_service.get_transport_stops(publication_coordinates)
+        transport_stop_name, transport_stop_dist = self.get_nearest_spots(publication_coordinates, transport_stops)
+
+        return ApartmentGeoFeatures(distance_to_center=distance_to_center, 
+                                    distance_to_shopping_mall=shopping_mall_dist, 
+                                    nearest_shopping_mall_name=shopping_mall_name,
+                                    distance_to_supermarket=supermarket_dist,
+                                    nearest_supermarket_name=supermarket_name,
+                                    distance_to_transport_stop=transport_stop_dist,
+                                    nearest_transport_stop_name=transport_stop_name)
 
     def get_accomodation_coordinates(self, 
                                      building, 
@@ -81,3 +99,11 @@ class ExtractorGEO:
         city_center_coordinates = self.get_city_center_coordinates(city, country)
         if not city_center_coordinates: return None
         return self.get_distance(accomodation_coordinates, city_center_coordinates)
+    
+    def get_nearest_spots(self, coordinates, spots: list[InfrastructureFeatures]):
+        spots_with_distance = [
+            (spot.name, self.get_distance(coordinates, (spot.latitude, spot.longitude))) 
+            for spot in spots
+        ]
+        if not spots_with_distance: return (None, None)
+        return min(spots_with_distance, key=lambda item: item[1])
