@@ -18,9 +18,10 @@ class Crawler(ABC):
             ),
             "Referer": "https://www.google.com/",
         }
-        self.date_limit = datetime.now() - timedelta(weeks=weeks_limit)
         self._stop = False
         self._links = []
+        self.date_limit = datetime.now() - timedelta(weeks=weeks_limit)
+
 
     def links(self):
         return self._links
