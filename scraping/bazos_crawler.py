@@ -3,7 +3,7 @@ import re
 import math
 from datetime import datetime
 from bs4 import SoupStrainer,BeautifulSoup
-from tamplate_of_crawlers import Crawler
+from scraping.tamplate_of_crawlers import Crawler
 from schemas.schemas import PublicationState,PublicationSource,ApartmentRawFeatures
 logger = logging.getLogger(__name__)
 
@@ -122,16 +122,3 @@ class BazosCrawler(Crawler):
         )
 
 
-if __name__ == "__main__":
-    #create the config for logger
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        handlers=[
-            logging.StreamHandler()
-        ],
-    )
-    #testing
-    crawler = BazosCrawler()
-    for page_items in crawler.start_processing():
-        print(page_items)

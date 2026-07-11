@@ -1,7 +1,7 @@
 import time
 import logging
-from scraping.bazos_crawler import BazosCrawler
 from db_interaction.publication_repository import PublicationRepository
+
 logger = logging.getLogger(__name__)
 
 SLEEP_INTERVAL_SECONDS = 7 * 86400
@@ -10,8 +10,9 @@ RETRY_INTERVAL_SECONDS = 30 * 60
 
 class CrawlRunner:
 
-    def __init__(self, repository: PublicationRepository):
+    def __init__(self, repository, crawler):
         self._repository = repository
+        self._crawler = crawler
 
     def crawl(self):
         while True:
@@ -24,11 +25,10 @@ class CrawlRunner:
                 time.sleep(SLEEP_INTERVAL_SECONDS)
 
     def crawl_once(self):
-        crawler = BazosCrawler()
         total_saved = 0
         has_work = False
 
-        for page_items in crawler.start_processing():
+        for page_items in self._crawler.start_processing():
             if not page_items:
                 continue
             has_work = True
