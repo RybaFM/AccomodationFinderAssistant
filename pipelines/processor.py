@@ -14,16 +14,17 @@ class PublicationProcessor:
         self.extractor_llm = extractor_llm
         self.extractor_geo = extractor_geo
 
-    def process(self, batch_size=20):
+    def process(self, batch_size=15):
         while True:
             has_work_llm = self.process_llm(batch_size)
             has_work_geo = self.process_geo(batch_size)
             has_work = has_work_llm or has_work_geo
+            time.sleep(60)
             if not has_work: 
-                logger.info("No publications to process, sleeping for 10 minutes")
+                logger.debug("No publications to process, sleeping for 10 minutes")
                 time.sleep(600)
 
-    def process_llm(self, batch_size=20):
+    def process_llm(self, batch_size=15):
         publications = self.publication_repository.select_raw_publications(batch_size)
         if not publications: return False
 
@@ -36,7 +37,7 @@ class PublicationProcessor:
         self.publication_repository.update_raw_publications(processed_publications)
         return True
 
-    def process_geo(self, batch_size=20):
+    def process_geo(self, batch_size=15):
         publications = self.publication_repository.select_llm_processed_publications(batch_size)
         if not publications: return False
 

@@ -30,8 +30,8 @@ class PublicationRepository:
                                 publication.source.value, 
                                 publication.description,
                                 publication.state.value, 
+                                publication.posted_date,
                                 publication.scraping_date, 
-                                publication.posted_date
                             ))
                     except Exception:
                         logger.exception("DB(accommodation_publication) INSERT ERROR")
@@ -55,7 +55,7 @@ class PublicationRepository:
             with psycopg.connect(self.db_url) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""SELECT id, building, street, district, city, country
-                                   FROM accomodation_publication
+                                   FROM accommodation_publication
                                    WHERE state = %s
                                    LIMIT %s""", 
                                    (PublicationState.LLM_PROCESSED.value, number))
@@ -91,6 +91,8 @@ class PublicationRepository:
                                                 price = %s, 
                                                 rooms = %s, 
                                                 area_sqm = %s, 
+                                                building_type = %s,
+                                                building_name = %s,
                                                 building = %s,
                                                 street = %s,
                                                 district = %s, 
@@ -101,6 +103,8 @@ class PublicationRepository:
                                             info.price,
                                             info.rooms,
                                             info.area_sqm,
+                                            info.building_type,
+                                            info.building_name,
                                             info.building,
                                             info.street,
                                             info.district,

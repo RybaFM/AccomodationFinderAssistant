@@ -14,6 +14,7 @@ class ExtractorLLM:
         system_instruction = """
         You are a specialized data extraction tool for real estate listings.
         Analyze the provided apartment post and extract the key parameters.
+        If listing is not an offer, but a demand, like "I am searching for a flat for ME, budget is 500 euro" return raw model with all Nones.
         Do not hallucinate or invent data. If a parameter is missing from the text, set it to null.
         """
         for attempt in range(max_retries):
@@ -30,7 +31,6 @@ class ExtractorLLM:
                 logger.debug(f"--- AI RESPONSE ({self.model_id}) ---")
                 logger.debug(response.text)
                 return ApartmentLLMFeatures.model_validate_json(response.text.strip())
-                #json.loads(response.text.strip())
             except Exception:
                 if attempt < max_retries-1:
                     sleep_time = (attempt + 1) * 2 
