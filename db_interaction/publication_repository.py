@@ -54,7 +54,7 @@ class PublicationRepository:
         try:
             with psycopg.connect(self.db_url) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("""SELECT id, building, street, district, city, country
+                    cursor.execute("""SELECT id, building, street, district, city, country, building_name
                                    FROM accommodation_publication
                                    WHERE state = %s
                                    LIMIT %s""", 

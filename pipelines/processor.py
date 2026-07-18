@@ -42,7 +42,7 @@ class PublicationProcessor:
         if not publications: return False
 
         processed_publications = []
-        for (publication_id, building, street, district, city, country) in publications:
+        for (publication_id, building, street, district, city, country, building_name) in publications:
             processed_publications.append((publication_id, self.extractor_geo.extract_info([building, street, district, city, country])))
             time.sleep(1.2)
 

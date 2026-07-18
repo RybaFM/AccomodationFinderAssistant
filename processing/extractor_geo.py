@@ -14,13 +14,15 @@ class ExtractorGEO:
         self.center_coordinates = {}
 
     def extract_info(self, publication_address: list[str]):
-        building, street, district, city, country = publication_address
+        if len(publication_address) != 6: return None
+        building, street, district, city, country, building_name = publication_address
         publication_coordinates = self.get_accomodation_coordinates(
                                                building,
                                                street,
                                                district,
                                                city,
-                                               country
+                                               country,
+                                               building_name
                                            )
         if not publication_coordinates: 
             return None
@@ -49,10 +51,12 @@ class ExtractorGEO:
                                      district, 
                                      city, 
                                      country, 
+                                     building_name,
                                      max_retries=3):
         queries = [
-            f"{building}, {street}, {district}, {city}, {country}" if building else None,
-            f"{street}, {district}, {city}, {country}" if street else None
+            ', '.join(x for x in [building, street, district, city, country] if x) if building else None,
+            ', '.join(x for x in [building_name, street, district, city, country] if x) if building_name else None,
+            ', '.join(x for x in [street, district, city, country] if x) if street else None
         ]
 
         queries = [q for q in queries if q]
