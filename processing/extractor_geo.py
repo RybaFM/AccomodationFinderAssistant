@@ -2,14 +2,16 @@ from schemas.schemas import ApartmentGeoFeatures, InfrastructureFeatures
 from processing.infrastructure_service import InfrastructureService
 import geopy
 from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
 from geopy import distance
 import time
 import logging
 logger = logging.getLogger(__name__)
 
 class ExtractorGEO:
-    def __init__(self, infrastructure_service: InfrastructureService):
-        self.geocoder = Nominatim(user_agent="AccomodationFinderAssistant/1.0 (contact: rjbikov.yaroslav@gmail.com)")
+    def __init__(self, infrastructure_service: InfrastructureService, liq_api_key):
+        self.geocoder = Nominatim(user_agent="AccomodationFinderAssistant/1.0 (contact: rjbikov.yaroslav@gmail.com)",
+                                  timeout=10)
         self.infrastructure_service = infrastructure_service
         self.center_coordinates = {}
 
