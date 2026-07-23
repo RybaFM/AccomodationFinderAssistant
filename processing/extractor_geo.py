@@ -1,19 +1,41 @@
 from schemas.schemas import ApartmentGeoFeatures, InfrastructureFeatures
 from processing.infrastructure_service import InfrastructureService
 import geopy
-from geopy.geocoders import Nominatim
-from geopy.extra.rate_limiter import RateLimiter
+import requests
+from ratelimit import limits, sleep_and_retry
 from geopy import distance
 import time
 import logging
 logger = logging.getLogger(__name__)
 
 class ExtractorGEO:
-    def __init__(self, infrastructure_service: InfrastructureService, liq_api_key):
-        self.geocoder = Nominatim(user_agent="AccomodationFinderAssistant/1.0 (contact: rjbikov.yaroslav@gmail.com)",
-                                  timeout=10)
+    def __init__(self, infrastructure_service: InfrastructureService, liq_api_key, calls=1, period=1):
+        '''self.geocoder = Nominatim(user_agent="AccomodationFinderAssistant/1.0 (contact: rjbikov.yaroslav@gmail.com)",
+                                  timeout=10)'''
+        self.geocoder_url = "https://us1.locationiq.com/v1/search"
+        self.api_key = liq_api_key
+        self.geocode_limiter = sleep_and_retry(
+            limits(calls=calls, period=period)(self.geocode)
+        )
         self.infrastructure_service = infrastructure_service
         self.center_coordinates = {}
+
+    def geocode(self, query):
+        response = requests.get(
+            self.geocoder_url, 
+            params={
+                "key": self.api_key,
+                "q": query,
+                "format": "json"
+            },
+            timeout=10
+        )
+        if response.status_code == 404: return None
+        response.raise_for_status()
+        results = response.json()
+        if results and len(results) > 0:
+                return (float(results[0]["lat"]), float(results[0]["lon"]))
+        return None
 
     def extract_info(self, publication_address: list[str]):
         if len(publication_address) != 6: return None
@@ -46,6 +68,20 @@ class ExtractorGEO:
                                     nearest_supermarket_name=supermarket_name,
                                     distance_to_transport_stop=transport_stop_dist,
                                     nearest_transport_stop_name=transport_stop_name)
+    
+    def perform_query(self, query, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                location = self.geocode_limiter(query)
+                if location is not None: return location
+            except Exception:
+                if attempt < max_retries-1:
+                    sleep_time = (attempt + 1) * 2 
+                    logger.warning("Nominatim API Error, retrying...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.exception("Nominatim API Error, all attempts failed for this post")
+        return None
 
     def get_accomodation_coordinates(self, 
                                      building, 
@@ -66,35 +102,18 @@ class ExtractorGEO:
         if not queries: return None
 
         for query in queries:
-            for attempt in range(max_retries):
-                try:
-                    location = self.geocoder.geocode(query)
-                    if location is not None: return (location.latitude, location.longitude)
-                except Exception:
-                    if attempt < max_retries-1:
-                        sleep_time = (attempt + 1) * 2 
-                        logger.warning("Nominatim API Error, retrying...")
-                        time.sleep(sleep_time)
-                    else:
-                        logger.exception("Nominatim API Error, all attempts failed for this post")
+            result = self.perform_query(query, max_retries)
+            if result is not None: return result
         return None
     
     def get_city_center_coordinates(self, city, country, max_retries=3):
         if (city, country) in self.center_coordinates: return self.center_coordinates[(city, country)]
         query = f"{city}, {country}"
-        for attempt in range(max_retries):
-            try:
-                location = self.geocoder.geocode(query)
-                if location is not None: 
-                    self.center_coordinates[(city, country)] = ((location.latitude, location.longitude))
-                    return (location.latitude, location.longitude)
-            except Exception:
-                if attempt < max_retries-1:
-                    sleep_time = (attempt + 1) * 2 
-                    logger.warning("Nominatim API Error, retrying...")
-                    time.sleep(sleep_time)
-                else:
-                    logger.exception("Nominatim API Error, all attempts failed for this post")
+
+        result = self.perform_query(query, max_retries)
+        if result is not None:
+            self.center_coordinates[(city, country)] = (result)
+            return result
         return None
     
     def get_distance(self, coordinates1: tuple, coordinates2: tuple):

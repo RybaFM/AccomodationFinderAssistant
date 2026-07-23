@@ -19,7 +19,6 @@ class PublicationProcessor:
             has_work_llm = self.process_llm(batch_size)
             has_work_geo = self.process_geo(batch_size)
             has_work = has_work_llm or has_work_geo
-            time.sleep(60)
             if not has_work: 
                 logger.debug("No publications to process, sleeping for 10 minutes")
                 time.sleep(600)
@@ -44,7 +43,6 @@ class PublicationProcessor:
         processed_publications = []
         for (publication_id, building, street, district, city, country, building_name) in publications:
             processed_publications.append((publication_id, self.extractor_geo.extract_info([building, street, district, city, country, building_name])))
-            time.sleep(1.2)
 
         self.publication_repository.update_llm_processed_publications(processed_publications)
         return True
