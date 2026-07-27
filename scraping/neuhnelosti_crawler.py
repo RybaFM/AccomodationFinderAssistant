@@ -15,12 +15,10 @@ class NehnutelnostiCrawler(Crawler):
     def __init__(self):
         super().__init__(weeks_limit=1)
         self._filter_main_obj = SoupStrainer(
-            name=lambda tag: tag not in ["script", "style", "noscript", "link", "head"]
+            name=lambda tag: tag not in ["script", "style"]
         )
 
-        self._detail_strainer_obj = SoupStrainer(
-            name=lambda tag: tag not in ["script", "style", "noscript", "link", "head"]
-        )
+        self._detail_strainer_obj = None
 
         self.add_links(
             "https://www.nehnutelnosti.sk/vysledky/prenajom",
@@ -88,6 +86,7 @@ class NehnutelnostiCrawler(Crawler):
         return None
 
     def _build_output(self, publication, detail_soup, url_publication, date):
+
         title_tag = detail_soup.find("h1", class_=re.compile(r"MuiTypography-h4"))
         title = title_tag.get_text().strip()
 
@@ -103,14 +102,11 @@ class NehnutelnostiCrawler(Crawler):
 
         desc_tag = detail_soup.find(
             "p",
-            {
-                "class": re.compile(r"MuiTypography-body2"),
-                "data-test-id": "text"
-            }
+            id="detail-description",
+            class_=lambda c: c and "MuiTypography-root" in c and "MuiTypography-body2" in c
         )
-
         description = desc_tag.get_text().strip()
-
+        print(description)
 
         final_description = (
             f"Title: {title}\n"
