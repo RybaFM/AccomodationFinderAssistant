@@ -37,6 +37,16 @@ class PublicationRepository:
                         logger.exception("DB(accommodation_publication) INSERT ERROR")
                         if conn.broken: break
 
+    def select_all_links(self):
+        try:
+            with psycopg.connect(self.db_url) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT link FROM accommodation_publication")
+                    return {row[0] for row in cursor.fetchall()}
+        except Exception:
+            logger.exception("DB(accommodation_publication) SELECT ERROR")
+            return set()
+
     def select_raw_publications(self, number=20):
         try:
             with psycopg.connect(self.db_url) as conn:

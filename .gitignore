@@ -2,3 +2,6 @@
 .idea
 __pycache__/
 *.pyc
+db_interaction/.Rhistory
+scraping/.Rhistory
+test/.Rhistory

@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class BazosCrawler(Crawler):
-    def __init__(self):
-        super().__init__(weeks_limit=1)
+    def __init__(self, seen_urls=None):
+        super().__init__(seen_urls=seen_urls, max_consecutive_duplicates=5)
         self._exceptions = {"Dohodou", "Zadarmo"}
         self._detail_strainer_obj = SoupStrainer("div", class_="maincontent")
         self._filter_main_obj = SoupStrainer("div", class_=["maincontent", "strankovani"])
@@ -44,7 +44,6 @@ class BazosCrawler(Crawler):
         return soup.select("div.inzeraty.inzeratyflex")
 
     def _date_of_post(self, publication):
-        #Getting data of posting that publication
         date_tag = publication.select_one('span.velikost10')
         if not date_tag:
             return None
@@ -96,13 +95,9 @@ class BazosCrawler(Crawler):
             return None
 
         location = " ".join(publication.select_one('div.inzeratylok').get_text(separator=" ").strip().split())
-
-
         title = detail_soup.select_one('h1.nadpisdetail').text.strip()
-
         paragraphs = detail_soup.select('div.popisdetail')
         description = '\n'.join(p.text.strip() for p in paragraphs) if paragraphs else ""
-
         price_text = f"Cena tohto bytu je {price}.\n" if price != "V texte" else ""
 
         final_text = (
@@ -111,7 +106,6 @@ class BazosCrawler(Crawler):
             f"{price_text}"
             f"Lokalita je {location}."
         )
-
         return ApartmentRawFeatures(
             source=PublicationSource.BAZOS,
             link=url_publication,
@@ -120,5 +114,3 @@ class BazosCrawler(Crawler):
             scraping_date=datetime.now(),
             posted_date=date,
         )
-
-
