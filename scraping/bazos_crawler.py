@@ -82,12 +82,8 @@ class BazosCrawler(Crawler):
             return None
         return self._main_url().rstrip("/") + next_div.get("href")
 
-    def _build_output(self,
-                      publication,
-                      detail_soup,
-                      url_publication,
-                      date):
-        #Creating output for publication
+    def _build_output(self, publication, detail_soup, url_publication):
+        date = self._date_of_post(publication)
 
         price = publication.select_one("div.inzeratycena").text.strip()
         if price in self._exceptions:

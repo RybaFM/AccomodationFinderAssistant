@@ -7,7 +7,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from telegram_bot.config import TELEGRAM_BOT_TOKEN, DATABASE_URL
-from telegram_bot.handlers import start #, recommend
+from telegram_bot.handlers import start ,filters #recommend
 from db_interaction.publication_repository import PublicationRepository
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ async def main():
     dp["repository"] = repository
 
     dp.include_router(start.router)
+    dp.include_router(filters.router)
     #dp.include_router(recommend.router)
 
     logger.info("Bot started")
