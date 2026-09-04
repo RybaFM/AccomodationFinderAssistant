@@ -2,7 +2,6 @@ from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from telegram_bot.keyboards.filters_kb import filters_menu_kb
 from telegram_bot.states.filter_states import FilterStates
 router = Router()

@@ -5,3 +5,5 @@ __pycache__/
 db_interaction/.Rhistory
 scraping/.Rhistory
 test/.Rhistory
+telegram_bot/handlers/.Rhistory
+telegram_bot/keyboards/.Rhistory

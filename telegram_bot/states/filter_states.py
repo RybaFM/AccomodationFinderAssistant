@@ -7,3 +7,4 @@ class FilterStates(StatesGroup):
     waiting_parking = State()
     waiting_pets = State()
     waiting_elevator = State()
+    waiting_floor = State()
