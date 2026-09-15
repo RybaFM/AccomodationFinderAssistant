@@ -1,6 +1,6 @@
 import time
 import logging
-from db_interaction.publication_repository import PublicationRepository
+from data_engine.db_interaction.publication_repository import PublicationRepository
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv, find_dotenv
-from db_interaction.publication_repository import PublicationRepository
-from processing.extractor_llm import ExtractorLLM
-from processing.extractor_geo import ExtractorGEO
-from processing.infrastructure_service import InfrastructureService
-from pipelines.processor import PublicationProcessor
+from data_engine.db_interaction.publication_repository import PublicationRepository
+from data_engine.processing.extractor_llm import ExtractorLLM
+from data_engine.processing.extractor_geo import ExtractorGEO
+from data_engine.processing.infrastructure_service import InfrastructureService
+from data_engine.pipelines.processor import PublicationProcessor
 
 load_dotenv(find_dotenv())
 db_url = os.getenv("DATABASE_URL")

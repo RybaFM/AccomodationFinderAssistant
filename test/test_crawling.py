@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv, find_dotenv
-from db_interaction.publication_repository import PublicationRepository
-from scraping.bazos_crawler import BazosCrawler
-from pipelines.crawling import CrawlRunner
+from data_engine.db_interaction.publication_repository import PublicationRepository
+from data_engine.scraping.bazos_crawler import BazosCrawler
+from data_engine.pipelines.crawling import CrawlRunner
 
 load_dotenv(find_dotenv())
 db_url = os.getenv("DATABASE_URL")

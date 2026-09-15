@@ -1,7 +1,7 @@
 import time
-from db_interaction.publication_repository import PublicationRepository
-from processing.extractor_llm import ExtractorLLM
-from processing.extractor_geo import ExtractorGEO
+from data_engine.db_interaction.publication_repository import PublicationRepository
+from data_engine.processing.extractor_llm import ExtractorLLM
+from data_engine.processing.extractor_geo import ExtractorGEO
 import logging
 logger = logging.getLogger(__name__)
 

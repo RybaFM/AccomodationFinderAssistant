@@ -3,7 +3,7 @@ import re
 import math
 from datetime import datetime
 from bs4 import SoupStrainer,BeautifulSoup
-from scraping.tamplate_of_crawlers import Crawler
+from data_engine.scraping.tamplate_of_crawlers import Crawler
 from schemas.schemas import PublicationState,PublicationSource,ApartmentRawFeatures
 logger = logging.getLogger(__name__)
 

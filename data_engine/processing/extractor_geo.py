@@ -1,5 +1,5 @@
 from schemas.schemas import ApartmentGeoFeatures, InfrastructureFeatures
-from processing.infrastructure_service import InfrastructureService
+from data_engine.processing.infrastructure_service import InfrastructureService
 import geopy
 import requests
 from ratelimit import limits, sleep_and_retry
