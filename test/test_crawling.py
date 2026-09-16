@@ -12,6 +12,7 @@ if not db_url:
 
 repo = PublicationRepository(db_url)
 
+repo.delete_old_publication()
 seen_urls = repo.select_all_links()
 
 crawler = BazosCrawler(seen_urls=seen_urls)

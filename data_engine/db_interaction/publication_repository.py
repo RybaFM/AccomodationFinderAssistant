@@ -177,3 +177,17 @@ class PublicationRepository:
                     except Exception:
                         logger.exception("DB(accommodation_publication) UPDATE ERROR")
                         if conn.broken: break
+
+    def delete_old_publication(self, months=1):
+        try:
+            with psycopg.connect(self.db_url) as conn:
+                with conn.cursor() as cursor:
+                    with conn.transaction():
+                        cursor.execute("""
+                            DELETE FROM accommodation_publication 
+                            WHERE date_crawler < CURRENT_DATE - make_interval(months => %s)
+                        """, (months,))
+                    logger.info("DB(accommodation_publication) Deleted old publications")
+
+        except Exception:
+            logger.exception("DB(accommodation_publication) DELETE ERROR")

@@ -25,7 +25,7 @@ async def open_menu(callback_query: CallbackQuery,state: FSMContext):
         }
         labels = {
             "parking" : "Do you need a parking spot?",
-            "elevator" : "Do you need a parking elevator?",
+            "elevator" : "Do you need an elevator?",
             "pets" : "Do you need a permit for animals?"
         }
         await state.set_state(state_map[request])

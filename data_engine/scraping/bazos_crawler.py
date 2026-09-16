@@ -20,6 +20,12 @@ class BazosCrawler(Crawler):
             "https://reality.bazos.sk/prenajmu/byt/?hledat=&rubriky=reality&hlokalita=81101"
             "&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano",
         )
+        self.add_links("https://reality.bazos.sk/prenajmu/dom/",
+        "https://reality.bazos.sk/prenajmu/dom/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano"
+        )
+        self.add_links("https://reality.bazos.sk/prenajmu/podnajom/",
+        "https://reality.bazos.sk/prenajmu/podnajom/?hledat=&rubriky=reality&hlokalita=81101&humkreis=10&cenaod=&cenado=&order=&crp=&kitx=ano"
+        )
     def _main_url(self):
         #main url
         return "https://reality.bazos.sk/"
