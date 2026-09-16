@@ -19,6 +19,10 @@ class PropertyType(str, Enum):
     ROOM_ONLY = "room_only"
     HOUSE = "house"
 
+class ValidStatus(str, Enum):
+    VALID = "valid"
+    INVALID = "invalid"
+
 # MODELS
 class ApartmentRawFeatures(BaseModel):
     source: PublicationSource
@@ -30,7 +34,6 @@ class ApartmentRawFeatures(BaseModel):
 
 class ApartmentLLMFeatures(BaseModel):
     property_type: Optional[Literal["entire_apartment", "room_only", "house"]] = Field(None, description="Type of property that is been rented out.")
-    is_offer: Optional[bool] = Field(None, description="True if publication is offering property to rent, false if publication is a demand.")
     price: Optional[int] = Field(None, description="Total apartment price per month (number only). If price and utilities are listed separately (e.g., 600 + 150), return the SUM (750). If not specified, return null.")
     rooms: Optional[float] = Field(None, description="Number of rooms (e.g., 1, 2, 3.5). If it's a studio (garzonka), return 1. If not specified, return null.")
     area_sqm: Optional[float] = Field(None, description="Apartment area in square meters (number only). If not specified, return null.")
@@ -47,8 +50,16 @@ class ApartmentLLMFeatures(BaseModel):
     street: Optional[str] = Field(None, description="Street where apartment is situated (e.g., Bajkalská). Do not include house numbers if they mess up the street name. If not specified, return null.")
     district: Optional[str] = Field(None, description="Borough/District name (e.g., Ružinov, Petržalka, Staré Mesto). DO NOT return postal codes (like 85104) or city names here. If only postal code is found, leave as null.")
     city: Optional[str] = Field(None, description="City where apartment is situated. If not specified, return null.")
-    country: Literal["Slovakia", "Austria", "Hungary"] = Field("Slovakia", description="Country where the apartment is located. Set to Austria if the city is Wolfsthal/Kittsee, or Hungary if Rajka.")
+    country: Optional[Literal["Slovakia", "Austria", "Hungary"]] = Field("Slovakia", description="Country where the apartment is located. Set to Austria if the city is Wolfsthal/Kittsee, or Hungary if Rajka.")
     currency: Optional[Literal["EUR", "HUF", "CZK"]] = Field(None, description="Currency that landlord used to state prices.")
+    publication_valid: Optional[ValidStatus] = Field(
+        None, 
+        description=(
+            "Set to 'valid' ONLY if the post is a long-term/monthly rental offer. "
+            "Set to 'invalid' if it is a purchase offer, property demand (looking to rent), "
+            "daily/short-term stay, spam, or has an incoherent description."
+        )
+    )
 
 class ApartmentGeoFeatures(BaseModel):
     distance_to_center: Optional[float]

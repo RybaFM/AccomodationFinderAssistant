@@ -33,6 +33,7 @@ class PublicationProcessor:
 
         successfully_processed = len(processed_publications) - sum(1 for _, info in processed_publications if info is None)
         logger.debug(f"LLM processed successfully {successfully_processed}/{len(processed_publications)} publications")
+        
         self.publication_repository.update_raw_publications(processed_publications)
         return True
 

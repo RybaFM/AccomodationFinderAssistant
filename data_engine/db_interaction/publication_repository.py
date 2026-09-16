@@ -1,5 +1,5 @@
 import psycopg
-from schemas.schemas import PublicationState, ApartmentRawFeatures, ApartmentLLMFeatures, ApartmentGeoFeatures
+from schemas.schemas import PublicationState, ValidStatus, ApartmentRawFeatures, ApartmentLLMFeatures, ApartmentGeoFeatures
 import logging
 logger = logging.getLogger(__name__)
 
@@ -90,8 +90,8 @@ class PublicationRepository:
             with conn.cursor() as cursor:
                 for (publication_id, info) in publications_extracted_info:
                     try:
-                        if info is None: 
-                            with conn.transaction():    
+                        if info is None or info.publication_valid == ValidStatus.INVALID.value: 
+                            with conn.transaction():
                                 self.set_error_state(cursor, publication_id)
                             continue
 
@@ -99,7 +99,6 @@ class PublicationRepository:
                             cursor.execute("""UPDATE accommodation_publication
                                             SET state = %s, 
                                                 property_type = %s,
-                                                is_offer = %s,
                                                 price = %s, 
                                                 rooms = %s, 
                                                 area_sqm = %s, 
@@ -121,7 +120,6 @@ class PublicationRepository:
                                             WHERE id = %s""", 
                                             (PublicationState.LLM_PROCESSED.value, 
                                             info.property_type,
-                                            info.is_offer,
                                             info.price,
                                             info.rooms,
                                             info.area_sqm,
