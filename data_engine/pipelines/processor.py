@@ -2,6 +2,7 @@ import time
 from data_engine.db_interaction.publication_repository import PublicationRepository
 from data_engine.processing.extractor_llm import ExtractorLLM
 from data_engine.processing.extractor_geo import ExtractorGEO
+from schemas.schemas import DEFAULT_SLEEP_TIME
 import logging
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class PublicationProcessor:
             has_work = has_work_llm or has_work_geo
             if not has_work: 
                 logger.debug("No publications to process, sleeping for 10 minutes")
-                time.sleep(600)
+                time.sleep(DEFAULT_SLEEP_TIME)
 
     def process_llm(self, batch_size=15):
         publications = self.publication_repository.select_raw_publications(batch_size)

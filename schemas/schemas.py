@@ -3,6 +3,9 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional
 from datetime import datetime
 
+# CONSTANTS 
+DEFAULT_SLEEP_TIME = 600
+
 # ENUMS
 class PublicationState(str, Enum):
     RAW = "raw"
